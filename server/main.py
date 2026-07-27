@@ -1,10 +1,32 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from datetime import datetime, timedelta
 from typing import List, Optional
 from pydantic import BaseModel
 from mock_data import inventory_items, orders, demand_forecasts, backlog_items, spending_summary, monthly_spending, category_spending, recent_transactions, purchase_orders
 
 app = FastAPI(title="Factory Inventory Management System")
+
+# Supplier lead time in days by product category. Restocking uses this plus the
+# destination warehouse's transit time to quote an expected delivery date.
+LEAD_TIME_DAYS_BY_CATEGORY = {
+    'Circuit Boards': 21,
+    'Controllers': 28,
+    'Power Supplies': 14,
+    'Sensors': 10,
+    'Actuators': 18
+}
+DEFAULT_LEAD_TIME_DAYS = 14
+WAREHOUSE_TRANSIT_DAYS = {
+    'San Francisco': 2,
+    'London': 5,
+    'Tokyo': 7
+}
+DEFAULT_TRANSIT_DAYS = 4
+
+# Submitted restocking orders live in process memory, same as the rest of this
+# demo's write paths - restarting the server clears them.
+restock_orders = []
 
 # Quarter mapping for date filtering
 QUARTER_MAP = {
@@ -120,6 +142,64 @@ class CreatePurchaseOrderRequest(BaseModel):
     expected_delivery_date: str
     notes: Optional[str] = None
 
+class RestockRecommendation(BaseModel):
+    sku: str
+    name: str
+    category: str
+    warehouse: str
+    unit_cost: float
+    quantity_on_hand: int
+    reorder_point: int
+    target_stock: int
+    deficit: int
+    full_cost: float
+    funded_quantity: int
+    funded_cost: float
+    funding: str  # funded | partial | deferred
+    priority: str  # high | medium | low
+    urgency_score: float
+    lead_time_days: int
+    forecast_trend: Optional[str] = None
+    forecasted_demand: Optional[int] = None
+
+class RestockPlan(BaseModel):
+    budget: float
+    max_budget: float
+    total_cost: float
+    remaining_budget: float
+    funded_items: int
+    funded_units: int
+    deferred_items: int
+    recommendations: List[RestockRecommendation]
+
+class RestockOrderLine(BaseModel):
+    sku: str
+    name: str
+    quantity: int
+    unit_cost: float
+    line_total: float
+
+class RestockOrder(BaseModel):
+    id: str
+    order_number: str
+    status: str
+    created_date: str
+    expected_delivery: str
+    lead_time_days: int
+    budget: Optional[float] = None
+    total_value: float
+    items: List[RestockOrderLine]
+    notes: Optional[str] = None
+
+class RestockOrderLineRequest(BaseModel):
+    sku: str
+    quantity: int
+
+class CreateRestockOrderRequest(BaseModel):
+    items: List[RestockOrderLineRequest]
+    budget: Optional[float] = None
+    notes: Optional[str] = None
+
 # API endpoints
 @app.get("/")
 def root():
@@ -207,6 +287,171 @@ def get_dashboard_summary(
         "total_orders_value": sum(order["total_value"] for order in filtered_orders)
     }
 
+def lead_time_for(category: str, warehouse: str) -> int:
+    """Total days from order to arrival: supplier build time plus inbound transit."""
+    supplier_days = LEAD_TIME_DAYS_BY_CATEGORY.get(category, DEFAULT_LEAD_TIME_DAYS)
+    transit_days = WAREHOUSE_TRANSIT_DAYS.get(warehouse, DEFAULT_TRANSIT_DAYS)
+    return supplier_days + transit_days
+
+def build_restock_candidates(warehouse: Optional[str] = None,
+                             category: Optional[str] = None) -> list:
+    """Score every inventory item that needs replenishing, most urgent first.
+
+    Target stock is the reorder point plus a cover layer. When a demand forecast
+    exists for the SKU the cover layer is the forecasted demand itself; otherwise
+    we fall back to half the reorder point as generic safety stock. Only 1 of the
+    9 forecast SKUs currently matches inventory, so most items take the fallback.
+    """
+    forecast_by_sku = {f['item_sku']: f for f in demand_forecasts}
+    candidates = []
+
+    for item in apply_filters(inventory_items, warehouse, category):
+        reorder_point = item['reorder_point']
+        on_hand = item['quantity_on_hand']
+        forecast = forecast_by_sku.get(item['sku'])
+
+        if forecast:
+            cover = forecast['forecasted_demand']
+        else:
+            cover = int(round(reorder_point * 0.5))
+
+        target_stock = reorder_point + cover
+        deficit = max(0, target_stock - on_hand)
+        if deficit == 0:
+            continue
+
+        # Urgency = how much of the target is unmet, with a hard boost for items
+        # already under the reorder point (operationally the ones that stock out),
+        # and a rising forecast breaking ties toward items that drain fastest.
+        coverage = on_hand / target_stock if target_stock else 0
+        base_score = max(0.0, min(60.0, (1 - coverage) * 60))
+        below_reorder_boost = 25 if on_hand < reorder_point else 0
+        trend_bonus = {'increasing': 15, 'stable': 6, 'decreasing': 0}.get(
+            forecast['trend'] if forecast else None, 3)
+        urgency_score = round(min(100.0, base_score + below_reorder_boost + trend_bonus), 1)
+
+        candidates.append({
+            'sku': item['sku'],
+            'name': item['name'],
+            'category': item['category'],
+            'warehouse': item['warehouse'],
+            'unit_cost': item['unit_cost'],
+            'quantity_on_hand': on_hand,
+            'reorder_point': reorder_point,
+            'target_stock': target_stock,
+            'deficit': deficit,
+            'full_cost': round(deficit * item['unit_cost'], 2),
+            'funded_quantity': 0,
+            'funded_cost': 0.0,
+            'funding': 'deferred',
+            'priority': 'high' if urgency_score >= 60 else 'medium' if urgency_score >= 35 else 'low',
+            'urgency_score': urgency_score,
+            'lead_time_days': lead_time_for(item['category'], item['warehouse']),
+            'forecast_trend': forecast['trend'] if forecast else None,
+            'forecasted_demand': forecast['forecasted_demand'] if forecast else None
+        })
+
+    # Most urgent first; cheaper first on a tie so a tight budget covers more lines.
+    candidates.sort(key=lambda c: (-c['urgency_score'], c['full_cost']))
+    return candidates
+
+@app.get("/api/restocking/recommendations", response_model=RestockPlan)
+def get_restock_recommendations(
+    budget: Optional[float] = Query(None, ge=0),
+    warehouse: Optional[str] = None,
+    category: Optional[str] = None
+):
+    """Recommend what to restock within a budget, most urgent items first.
+
+    Allocation is a single greedy pass over the urgency ordering. The first item
+    that cannot be fully funded is topped up with whatever budget remains (a
+    partial line), and everything after it is reported as deferred so the UI can
+    show what the budget is leaving on the table.
+    """
+    candidates = build_restock_candidates(warehouse, category)
+    max_budget = round(sum(c['full_cost'] for c in candidates), 2)
+
+    # No budget supplied means "show me the full picture" rather than "spend nothing".
+    remaining = max_budget if budget is None else budget
+
+    for candidate in candidates:
+        if remaining <= 0:
+            break
+        if candidate['full_cost'] <= remaining:
+            candidate['funded_quantity'] = candidate['deficit']
+            candidate['funded_cost'] = candidate['full_cost']
+            candidate['funding'] = 'funded'
+            remaining = round(remaining - candidate['full_cost'], 2)
+        else:
+            affordable_units = int(remaining // candidate['unit_cost'])
+            if affordable_units > 0:
+                candidate['funded_quantity'] = affordable_units
+                candidate['funded_cost'] = round(affordable_units * candidate['unit_cost'], 2)
+                candidate['funding'] = 'partial'
+                remaining = round(remaining - candidate['funded_cost'], 2)
+
+    total_cost = round(sum(c['funded_cost'] for c in candidates), 2)
+    effective_budget = max_budget if budget is None else budget
+
+    return {
+        'budget': round(effective_budget, 2),
+        'max_budget': max_budget,
+        'total_cost': total_cost,
+        'remaining_budget': round(effective_budget - total_cost, 2),
+        'funded_items': len([c for c in candidates if c['funding'] != 'deferred']),
+        'funded_units': sum(c['funded_quantity'] for c in candidates),
+        'deferred_items': len([c for c in candidates if c['funding'] == 'deferred']),
+        'recommendations': candidates
+    }
+
+@app.get("/api/restocking/orders", response_model=List[RestockOrder])
+def get_restock_orders():
+    """Get restocking orders submitted during this server session, newest first."""
+    return list(reversed(restock_orders))
+
+@app.post("/api/restocking/orders", response_model=RestockOrder, status_code=201)
+def create_restock_order(request: CreateRestockOrderRequest):
+    """Submit a restocking order. Lead time is the slowest line in the order."""
+    if not request.items:
+        raise HTTPException(status_code=400, detail="A restocking order needs at least one item")
+
+    inventory_by_sku = {item['sku']: item for item in inventory_items}
+    lines = []
+    lead_time_days = 0
+
+    for line in request.items:
+        item = inventory_by_sku.get(line.sku)
+        if not item:
+            raise HTTPException(status_code=404, detail=f"Unknown SKU {line.sku}")
+        if line.quantity < 1:
+            raise HTTPException(status_code=400, detail=f"Quantity for {line.sku} must be at least 1")
+
+        lines.append({
+            'sku': item['sku'],
+            'name': item['name'],
+            'quantity': line.quantity,
+            'unit_cost': item['unit_cost'],
+            'line_total': round(line.quantity * item['unit_cost'], 2)
+        })
+        # The whole order lands when its slowest line lands.
+        lead_time_days = max(lead_time_days, lead_time_for(item['category'], item['warehouse']))
+
+    created = datetime.now()
+    order = {
+        'id': f"RSO-{len(restock_orders) + 1:04d}",
+        'order_number': f"RSO-{len(restock_orders) + 1:04d}",
+        'status': 'Submitted',
+        'created_date': created.strftime('%Y-%m-%d'),
+        'expected_delivery': (created + timedelta(days=lead_time_days)).strftime('%Y-%m-%d'),
+        'lead_time_days': lead_time_days,
+        'budget': round(request.budget, 2) if request.budget is not None else None,
+        'total_value': round(sum(line['line_total'] for line in lines), 2),
+        'items': lines,
+        'notes': request.notes
+    }
+    restock_orders.append(order)
+    return order
+
 @app.get("/api/spending/summary")
 def get_spending_summary():
     """Get spending summary statistics"""
@@ -228,12 +473,21 @@ def get_recent_transactions():
     return recent_transactions
 
 @app.get("/api/reports/quarterly")
-def get_quarterly_reports():
-    """Get quarterly performance reports"""
+def get_quarterly_reports(
+    warehouse: Optional[str] = None,
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    month: Optional[str] = None
+):
+    """Get quarterly performance reports, honouring the global filter bar."""
+    # Apply the same filters as every other data view before aggregating.
+    source_orders = apply_filters(orders, warehouse, category, status)
+    source_orders = filter_by_month(source_orders, month)
+
     # Calculate quarterly statistics from orders
     quarters = {}
 
-    for order in orders:
+    for order in source_orders:
         order_date = order.get('order_date', '')
         # Determine quarter
         if '2025-01' in order_date or '2025-02' in order_date or '2025-03' in order_date:
@@ -274,11 +528,19 @@ def get_quarterly_reports():
     return result
 
 @app.get("/api/reports/monthly-trends")
-def get_monthly_trends():
-    """Get month-over-month trends"""
+def get_monthly_trends(
+    warehouse: Optional[str] = None,
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    month: Optional[str] = None
+):
+    """Get month-over-month trends, honouring the global filter bar."""
+    source_orders = apply_filters(orders, warehouse, category, status)
+    source_orders = filter_by_month(source_orders, month)
+
     months = {}
 
-    for order in orders:
+    for order in source_orders:
         order_date = order.get('order_date', '')
         if not order_date:
             continue

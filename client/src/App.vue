@@ -1,42 +1,54 @@
 <template>
-  <div class="app">
-    <header class="top-nav">
-      <div class="nav-container">
-        <div class="logo">
-          <h1>{{ t('nav.companyName') }}</h1>
-          <span class="subtitle">{{ t('nav.subtitle') }}</span>
+  <div class="app" :class="{ 'sidebar-collapsed': collapsed }">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-mark">CC</div>
+          <div class="brand-text">
+            <h1>{{ t('nav.companyName') }}</h1>
+            <span class="subtitle">{{ t('nav.subtitle') }}</span>
+          </div>
         </div>
-        <nav class="nav-tabs">
-          <router-link to="/" :class="{ active: $route.path === '/' }">
-            {{ t('nav.overview') }}
-          </router-link>
-          <router-link to="/inventory" :class="{ active: $route.path === '/inventory' }">
-            {{ t('nav.inventory') }}
-          </router-link>
-          <router-link to="/orders" :class="{ active: $route.path === '/orders' }">
-            {{ t('nav.orders') }}
-          </router-link>
-          <router-link to="/spending" :class="{ active: $route.path === '/spending' }">
-            {{ t('nav.finance') }}
-          </router-link>
-          <router-link to="/demand" :class="{ active: $route.path === '/demand' }">
-            {{ t('nav.demandForecast') }}
-          </router-link>
-          <router-link to="/reports" :class="{ active: $route.path === '/reports' }">
-            Reports
-          </router-link>
-        </nav>
-        <LanguageSwitcher />
-        <ProfileMenu
-          @show-profile-details="showProfileDetails = true"
-          @show-tasks="showTasks = true"
-        />
       </div>
-    </header>
-    <FilterBar />
-    <main class="main-content">
-      <router-view />
-    </main>
+
+      <nav class="sidebar-nav">
+        <router-link
+          v-for="item in navItems"
+          :key="item.path"
+          :to="item.path"
+          class="nav-item"
+          :class="{ active: $route.path === item.path }"
+          :title="collapsed ? t(item.labelKey) : null"
+        >
+          <span class="nav-icon" v-html="item.icon"></span>
+          <span class="nav-label">{{ t(item.labelKey) }}</span>
+        </router-link>
+      </nav>
+
+      <button class="collapse-toggle" @click="toggleCollapse" :aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'">
+        <span class="nav-icon" v-html="collapsed ? icons.chevronRight : icons.chevronLeft"></span>
+        <span class="nav-label">{{ t('nav.collapse') }}</span>
+      </button>
+    </aside>
+
+    <div class="app-body">
+      <header class="topbar">
+        <div class="topbar-title">{{ currentPageTitle }}</div>
+        <div class="topbar-actions">
+          <LanguageSwitcher />
+          <ProfileMenu
+            @show-profile-details="showProfileDetails = true"
+            @show-tasks="showTasks = true"
+          />
+        </div>
+      </header>
+
+      <FilterBar />
+
+      <main class="main-content">
+        <router-view />
+      </main>
+    </div>
 
     <ProfileDetailsModal
       :is-open="showProfileDetails"
@@ -56,6 +68,7 @@
 
 <script>
 import { ref, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { api } from './api'
 import { useAuth } from './composables/useAuth'
 import { useI18n } from './composables/useI18n'
@@ -64,6 +77,34 @@ import ProfileMenu from './components/ProfileMenu.vue'
 import ProfileDetailsModal from './components/ProfileDetailsModal.vue'
 import TasksModal from './components/TasksModal.vue'
 import LanguageSwitcher from './components/LanguageSwitcher.vue'
+
+// Inline stroke icons (currentColor). No emoji per the project design system.
+const svg = (inner) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`
+
+const icons = {
+  overview: svg('<rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>'),
+  inventory: svg('<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96 12 12.01l8.73-5.05"/><path d="M12 22.08V12"/>'),
+  orders: svg('<path d="M9 2h6l1 3H8z"/><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M9 11h6M9 15h4"/>'),
+  finance: svg('<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'),
+  demand: svg('<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>'),
+  restocking: svg('<path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>'),
+  reports: svg('<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>'),
+  backlog: svg('<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>'),
+  chevronLeft: svg('<polyline points="15 18 9 12 15 6"/>'),
+  chevronRight: svg('<polyline points="9 18 15 12 9 6"/>')
+}
+
+const navItems = [
+  { path: '/', labelKey: 'nav.overview', icon: icons.overview },
+  { path: '/inventory', labelKey: 'nav.inventory', icon: icons.inventory },
+  { path: '/orders', labelKey: 'nav.orders', icon: icons.orders },
+  { path: '/spending', labelKey: 'nav.finance', icon: icons.finance },
+  { path: '/demand', labelKey: 'nav.demandForecast', icon: icons.demand },
+  { path: '/restocking', labelKey: 'nav.restocking', icon: icons.restocking },
+  { path: '/reports', labelKey: 'nav.reports', icon: icons.reports },
+  { path: '/backlog', labelKey: 'nav.backlog', icon: icons.backlog }
+]
 
 export default {
   name: 'App',
@@ -77,9 +118,23 @@ export default {
   setup() {
     const { currentUser } = useAuth()
     const { t } = useI18n()
+    const route = useRoute()
     const showProfileDetails = ref(false)
     const showTasks = ref(false)
     const apiTasks = ref([])
+
+    // Sidebar collapse (icons-only mode); persisted across reloads.
+    const collapsed = ref(localStorage.getItem('sidebar-collapsed') === 'true')
+    const toggleCollapse = () => {
+      collapsed.value = !collapsed.value
+      localStorage.setItem('sidebar-collapsed', String(collapsed.value))
+    }
+
+    // Page title shown in the topbar, derived from the active route's nav item.
+    const currentPageTitle = computed(() => {
+      const item = navItems.find(n => n.path === route.path)
+      return item ? t(item.labelKey) : ''
+    })
 
     // Merge mock tasks from currentUser with API tasks
     const tasks = computed(() => {
@@ -150,6 +205,11 @@ export default {
 
     return {
       t,
+      icons,
+      navItems,
+      collapsed,
+      toggleCollapse,
+      currentPageTitle,
       showProfileDetails,
       showTasks,
       tasks,
@@ -176,102 +236,234 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ---------------------------------------------------------------------------
+   SaaS shell: fixed vertical sidebar (collapsible to icons-only) + content column
+--------------------------------------------------------------------------- */
 .app {
   display: flex;
-  flex-direction: column;
   min-height: 100vh;
+  --sidebar-width: 248px;
+  --sidebar-width-collapsed: 76px;
 }
 
-.top-nav {
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-  position: sticky;
+.sidebar {
+  position: fixed;
   top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
+  background: #0f172a;
+  color: #cbd5e1;
+  display: flex;
+  flex-direction: column;
   z-index: 100;
+  transition: width 0.2s ease;
+  overflow: hidden;
 }
 
-.nav-container {
-  max-width: 1600px;
-  margin: 0 auto;
+.app.sidebar-collapsed .sidebar {
+  width: var(--sidebar-width-collapsed);
+}
+
+.sidebar-header {
+  height: 70px;
   display: flex;
   align-items: center;
-  padding: 0 2rem;
-  height: 70px;
+  padding: 0 1.25rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  flex-shrink: 0;
 }
 
-.nav-container > .nav-tabs {
-  margin-left: auto;
-  margin-right: 1rem;
-}
-
-.nav-container > .language-switcher {
-  margin-right: 1rem;
-}
-
-.logo {
+.brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.75rem;
+  min-width: 0;
 }
 
-.logo h1 {
-  font-size: 1.375rem;
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
   font-weight: 700;
-  color: #0f172a;
-  letter-spacing: -0.025em;
+  font-size: 0.875rem;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.brand-text h1 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
 }
 
 .subtitle {
-  font-size: 0.813rem;
-  color: #64748b;
+  font-size: 0.7rem;
+  color: #94a3b8;
   font-weight: 400;
-  padding-left: 0.75rem;
-  border-left: 1px solid #e2e8f0;
 }
 
-.nav-tabs {
+.sidebar-nav {
+  flex: 1;
   display: flex;
-  gap: 0.25rem;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.75rem;
+  overflow-y: auto;
 }
 
-.nav-tabs a {
-  padding: 0.625rem 1.25rem;
-  color: #64748b;
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 8px;
+  color: #cbd5e1;
   text-decoration: none;
   font-weight: 500;
-  font-size: 0.938rem;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-  position: relative;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.nav-tabs a:hover {
-  color: #0f172a;
-  background: #f1f5f9;
+.nav-item:hover {
+  background: rgba(148, 163, 184, 0.12);
+  color: #f8fafc;
 }
 
-.nav-tabs a.active {
-  color: #2563eb;
-  background: #eff6ff;
-}
-
-.nav-tabs a.active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
+.nav-item.active {
   background: #2563eb;
+  color: #ffffff;
+}
+
+.nav-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.nav-icon :deep(svg) {
+  width: 20px;
+  height: 20px;
+}
+
+.nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.collapse-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  margin: 0.5rem 0.75rem 1rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+  font-family: inherit;
+}
+
+.collapse-toggle:hover {
+  background: rgba(148, 163, 184, 0.12);
+  color: #f8fafc;
+}
+
+/* Icons-only mode: hide text, center the glyphs */
+.app.sidebar-collapsed .brand-text,
+.app.sidebar-collapsed .nav-label {
+  display: none;
+}
+
+.app.sidebar-collapsed .nav-item,
+.app.sidebar-collapsed .collapse-toggle,
+.app.sidebar-collapsed .sidebar-header {
+  justify-content: center;
+}
+
+.app.sidebar-collapsed .brand {
+  gap: 0;
+}
+
+/* Content column sits to the right of the fixed sidebar */
+.app-body {
+  flex: 1;
+  min-width: 0;
+  margin-left: var(--sidebar-width);
+  display: flex;
+  flex-direction: column;
+  transition: margin-left 0.2s ease;
+}
+
+.app.sidebar-collapsed .app-body {
+  margin-left: var(--sidebar-width-collapsed);
+}
+
+.topbar {
+  height: 70px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 90;
+}
+
+.topbar-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-left: auto;
 }
 
 .main-content {
   flex: 1;
-  max-width: 1600px;
   width: 100%;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 1.5rem 2rem;
+}
+
+@media (max-width: 640px) {
+  .app {
+    --sidebar-width: var(--sidebar-width-collapsed);
+  }
+  .app .brand-text,
+  .app .nav-label {
+    display: none;
+  }
+  .app .nav-item,
+  .app .collapse-toggle,
+  .app .sidebar-header {
+    justify-content: center;
+  }
 }
 
 .page-header {
