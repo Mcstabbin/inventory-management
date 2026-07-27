@@ -9,6 +9,7 @@ export default {
     restocking: 'Restocking',
     reports: 'Reports',
     backlog: 'Backlog',
+    collapse: 'Collapse',
     companyName: 'Catalyst Components',
     subtitle: 'Inventory Management System'
   },

@@ -9,6 +9,7 @@ export default {
     restocking: '補充計画',
     reports: 'レポート',
     backlog: 'バックログ',
+    collapse: '折りたたむ',
     companyName: '触媒コンポーネンツ',
     subtitle: '在庫管理システム'
   },
