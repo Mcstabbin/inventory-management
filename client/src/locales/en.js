@@ -6,6 +6,7 @@ export default {
     orders: 'Orders',
     finance: 'Finance',
     demandForecast: 'Demand Forecast',
+    restocking: 'Restocking',
     companyName: 'Catalyst Components',
     subtitle: 'Inventory Management System'
   },
@@ -106,6 +107,8 @@ export default {
     title: 'Orders',
     description: 'View and manage customer orders',
     allOrders: 'All Orders',
+    submittedOrders: 'Submitted Orders',
+    leadTime: 'Lead Time',
     totalOrders: 'Total Orders',
     totalRevenue: 'Total Revenue',
     avgOrderValue: 'Avg Order Value',
@@ -188,6 +191,49 @@ export default {
     }
   },
 
+  // Restocking
+  restocking: {
+    title: 'Restocking',
+    description: 'Recommend what to restock within a budget, prioritized by demand',
+    budgetLabel: 'Available budget',
+    budgetHint: 'Drag to set how much you can spend. Recommendations update live.',
+    coverageTitle: 'Budget coverage',
+    fullyFunded: 'Fully funded',
+    partiallyFunded: 'Partially funded',
+    deferred: 'Deferred',
+    spend: 'Planned spend',
+    remaining: 'Remaining',
+    maxNeeded: 'Full restock cost',
+    fundedItems: 'Items funded',
+    fundedUnits: 'Units funded',
+    deferredItems: 'Items deferred',
+    recommendations: 'Recommended restocks',
+    placeOrder: 'Place Order',
+    placingOrder: 'Placing order...',
+    orderPlaced: 'Restocking order {orderNumber} submitted',
+    nothingToOrder: 'Nothing to order at this budget',
+    noRecommendations: 'Everything is above its target stock. No restocking needed.',
+    priority: 'Priority',
+    high: 'High',
+    medium: 'Medium',
+    low: 'Low',
+    table: {
+      item: 'Item',
+      warehouse: 'Warehouse',
+      onHand: 'On Hand',
+      reorderPoint: 'Reorder Pt',
+      need: 'Need',
+      order: 'Order',
+      unitCost: 'Unit Cost',
+      lineCost: 'Line Cost',
+      leadTime: 'Lead Time',
+      priority: 'Priority',
+      funding: 'Funding'
+    },
+    daysLead: '{days} days',
+    ofNeeded: 'of {needed}'
+  },
+
   // Filters
   filters: {
     timePeriod: 'Time Period',
@@ -204,6 +250,7 @@ export default {
     shipped: 'Shipped',
     processing: 'Processing',
     backordered: 'Backordered',
+    submitted: 'Submitted',
     inStock: 'In Stock',
     lowStock: 'Low Stock',
     adequate: 'Adequate'

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catalyst Components — System Architecture</title>
+<style>
+  :root {
+    --ink: #0f172a;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --bg: #f8fafc;
+    --panel: #ffffff;
+    --accent: #2563eb;
+    --accent-soft: #eff6ff;
+    --green: #059669;
+    --amber: #ea580c;
+    --red: #dc2626;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: #1e293b;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.55;
+  }
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    padding: 2rem 2rem 1.75rem;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  header h1 {
+    font-size: 1.75rem; font-weight: 700; color: var(--ink);
+    letter-spacing: -0.025em;
+  }
+  header p { color: var(--muted); font-size: 0.938rem; margin-top: 0.375rem; }
+  .meta { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+  .pill {
+    font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em;
+    padding: 0.313rem 0.75rem; border-radius: 999px;
+    background: var(--accent-soft); color: #1e40af;
+  }
+  main { max-width: 1200px; margin: 0 auto; padding: 1.75rem 2rem 4rem; }
+  section { margin-bottom: 2rem; }
+  h2 {
+    font-size: 1.125rem; font-weight: 700; color: var(--ink);
+    letter-spacing: -0.02em; margin-bottom: 0.875rem;
+    padding-bottom: 0.625rem; border-bottom: 1px solid var(--line);
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.25rem;
+  }
+  .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem; }
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.25rem; }
+
+  /* Layer diagram */
+  .layers { display: grid; gap: 0.75rem; }
+  .layer {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1rem 1.25rem;
+    border-left: 4px solid var(--accent);
+  }
+  .layer.data { border-left-color: var(--green); }
+  .layer.api { border-left-color: var(--amber); }
+  .layer-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 1rem; flex-wrap: wrap; margin-bottom: 0.625rem;
+  }
+  .layer-title { font-weight: 700; color: var(--ink); font-size: 1rem; }
+  .layer-sub { font-size: 0.813rem; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .chips { display: flex; gap: 0.375rem; flex-wrap: wrap; }
+  .chip {
+    font-size: 0.75rem; padding: 0.25rem 0.563rem; border-radius: 6px;
+    background: #f1f5f9; color: #334155; border: 1px solid var(--line);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .arrow {
+    text-align: center; color: var(--muted); font-size: 0.813rem;
+    font-weight: 600; letter-spacing: 0.04em;
+  }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead { background: var(--bg); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  th {
+    text-align: left; padding: 0.5rem 0.75rem; font-size: 0.7rem;
+    font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  td {
+    padding: 0.5rem 0.75rem; border-top: 1px solid #f1f5f9;
+    font-size: 0.844rem; color: #334155; vertical-align: top;
+  }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.813rem; }
+  .table-wrap { overflow-x: auto; }
+
+  ol.flow { list-style: none; counter-reset: f; }
+  ol.flow li {
+    counter-increment: f; position: relative; padding-left: 2.25rem;
+    padding-bottom: 0.875rem; font-size: 0.906rem;
+  }
+  ol.flow li:not(:last-child)::after {
+    content: ''; position: absolute; left: 0.75rem; top: 1.65rem; bottom: 0.1rem;
+    width: 1px; background: var(--line);
+  }
+  ol.flow li::before {
+    content: counter(f); position: absolute; left: 0; top: 0.1rem;
+    width: 1.5rem; height: 1.5rem; border-radius: 50%;
+    background: var(--accent-soft); color: #1e40af;
+    font-size: 0.75rem; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  ul.plain { list-style: none; }
+  ul.plain li {
+    font-size: 0.875rem; padding: 0.375rem 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  ul.plain li:last-child { border-bottom: none; }
+  .k { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+  .badge {
+    display: inline-block; padding: 0.125rem 0.5rem; border-radius: 5px;
+    font-size: 0.688rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .badge.ok { background: #d1fae5; color: #065f46; }
+  .badge.gap { background: #fecaca; color: #991b1b; }
+  footer { color: var(--muted); font-size: 0.813rem; text-align: center; padding-bottom: 2rem; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Catalyst Components — Inventory Management</h1>
+    <p>System architecture, technology stack, and data flow</p>
+    <div class="meta">
+      <span class="pill">Vue 3 + Composition API</span>
+      <span class="pill">Vite :3000</span>
+      <span class="pill">FastAPI :8001</span>
+      <span class="pill">In-memory JSON (no DB)</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section>
+    <h2>System Architecture</h2>
+    <div class="layers">
+      <div class="layer">
+        <div class="layer-head">
+          <span class="layer-title">Presentation — Vue 3 SPA</span>
+          <span class="layer-sub">client/src · Vite dev server, port 3000</span>
+        </div>
+        <div class="chips">
+          <span class="chip">App.vue (shell + global CSS)</span>
+          <span class="chip">vue-router (history mode)</span>
+          <span class="chip">FilterBar.vue</span>
+          <span class="chip">LanguageSwitcher.vue</span>
+          <span class="chip">ProfileMenu.vue</span>
+          <span class="chip">7 detail/modal components</span>
+        </div>
+      </div>
+
+      <div class="arrow">▼ &nbsp; views read shared state from composables &nbsp; ▼</div>
+
+      <div class="layer">
+        <div class="layer-head">
+          <span class="layer-title">Shared client state — composables (singleton refs)</span>
+          <span class="layer-sub">client/src/composables/</span>
+        </div>
+        <div class="chips">
+          <span class="chip">useFilters.js — period · location · category · status</span>
+          <span class="chip">useI18n.js — en / ja</span>
+          <span class="chip">useAuth.js — current user</span>
+        </div>
+      </div>
+
+      <div class="arrow">▼ &nbsp; filters serialized to query params &nbsp; ▼</div>
+
+      <div class="layer api">
+        <div class="layer-head">
+          <span class="layer-title">API client — single axios gateway</span>
+          <span class="layer-sub">client/src/api.js → http://localhost:8001/api</span>
+        </div>
+        <div class="chips">
+          <span class="chip">getInventory</span>
+          <span class="chip">getOrders</span>
+          <span class="chip">getDemandForecasts</span>
+          <span class="chip">getBacklog</span>
+          <span class="chip">getDashboardSummary</span>
+          <span class="chip">getSpending*</span>
+          <span class="chip">tasks CRUD</span>
+          <span class="chip">purchase orders</span>
+        </div>
+      </div>
+
+      <div class="arrow">▼ &nbsp; HTTP / JSON &nbsp; ▼</div>
+
+      <div class="layer api">
+        <div class="layer-head">
+          <span class="layer-title">Application — FastAPI</span>
+          <span class="layer-sub">server/main.py · CORS allow-all (dev) · port 8001</span>
+        </div>
+        <div class="chips">
+          <span class="chip">Pydantic request/response models</span>
+          <span class="chip">In-process list comprehension filtering</span>
+          <span class="chip">Aggregation for dashboard &amp; reports</span>
+          <span class="chip">/docs (OpenAPI)</span>
+        </div>
+      </div>
+
+      <div class="arrow">▼ &nbsp; loaded once at startup &nbsp; ▼</div>
+
+      <div class="layer data">
+        <div class="layer-head">
+          <span class="layer-title">Data — JSON fixtures held in memory</span>
+          <span class="layer-sub">server/mock_data.py → server/data/*.json</span>
+        </div>
+        <div class="chips">
+          <span class="chip">orders.json (148 KB)</span>
+          <span class="chip">inventory.json</span>
+          <span class="chip">transactions.json</span>
+          <span class="chip">spending.json</span>
+          <span class="chip">demand_forecasts.json</span>
+          <span class="chip">backlog_items.json</span>
+          <span class="chip">purchase_orders.json</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Request Data Flow</h2>
+    <div class="card">
+      <ol class="flow">
+        <li>User changes a control in <code>FilterBar.vue</code> — one of Time Period, Location, Category, Order Status.</li>
+        <li>The bound <code>ref</code> inside <code>useFilters.js</code> updates. Because the refs are module-level singletons, every view sees the change immediately.</li>
+        <li>The active view's <code>watch</code> fires and calls <code>getCurrentFilters()</code>, which maps <code>selectedPeriod → month</code> and <code>selectedLocation → warehouse</code>.</li>
+        <li><code>client/src/api.js</code> drops any filter equal to <code>'all'</code>, builds a <code>URLSearchParams</code> string, and issues the axios GET.</li>
+        <li>FastAPI validates query params, filters the in-memory lists sequentially, and aggregates where needed (dashboard summary, quarterly reports).</li>
+        <li>The response is validated against a Pydantic <code>response_model</code> and returned as JSON.</li>
+        <li>The view stores raw rows in a <code>ref</code> (<code>allOrders</code>, <code>inventoryItems</code>); every derived number is a <code>computed</code>, so KPI cards and SVG charts recalculate automatically.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <h2>Routes &amp; Views</h2>
+    <div class="card table-wrap">
+      <table>
+        <thead>
+          <tr><th>Route</th><th>View</th><th>Primary endpoints</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>/</code></td><td><code>Dashboard.vue</code></td><td><code>/api/dashboard/summary</code></td><td>KPI cards, revenue vs. cost charts, order summaries</td></tr>
+          <tr><td><code>/inventory</code></td><td><code>Inventory.vue</code></td><td><code>/api/inventory</code></td><td>Stock levels by warehouse (no time dimension)</td></tr>
+          <tr><td><code>/orders</code></td><td><code>Orders.vue</code></td><td><code>/api/orders</code></td><td>Order tracking with status filters</td></tr>
+          <tr><td><code>/spending</code></td><td><code>Spending.vue</code></td><td><code>/api/spending/*</code></td><td>Finance dashboard — revenue, costs, transactions</td></tr>
+          <tr><td><code>/demand</code></td><td><code>Demand.vue</code></td><td><code>/api/demand</code></td><td>Demand forecasting and trend direction</td></tr>
+          <tr><td><code>/reports</code></td><td><code>Reports.vue</code></td><td><code>/api/reports/quarterly</code>, <code>/api/reports/monthly-trends</code></td><td>Quarterly and trend reporting</td></tr>
+          <tr><td><em>unrouted</em></td><td><code>Backlog.vue</code></td><td><code>/api/backlog</code></td><td>Backlog monitoring — component exists but has no route registered in <code>main.js</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div>
+      <h2>API Surface</h2>
+      <div class="card table-wrap">
+        <table>
+          <thead><tr><th>Endpoint</th><th>Filters honoured</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /api/inventory</code></td><td>warehouse, category</td></tr>
+            <tr><td><code>GET /api/inventory/{id}</code></td><td>—</td></tr>
+            <tr><td><code>GET /api/orders</code></td><td>warehouse, category, status, month</td></tr>
+            <tr><td><code>GET /api/orders/{id}</code></td><td>—</td></tr>
+            <tr><td><code>GET /api/dashboard/summary</code></td><td>all four</td></tr>
+            <tr><td><code>GET /api/demand</code></td><td>none</td></tr>
+            <tr><td><code>GET /api/backlog</code></td><td>none</td></tr>
+            <tr><td><code>GET /api/spending/summary</code></td><td>none</td></tr>
+            <tr><td><code>GET /api/spending/monthly</code></td><td>none</td></tr>
+            <tr><td><code>GET /api/spending/categories</code></td><td>none</td></tr>
+            <tr><td><code>GET /api/spending/transactions</code></td><td>none</td></tr>
+            <tr><td><code>GET /api/reports/quarterly</code></td><td>none</td></tr>
+            <tr><td><code>GET /api/reports/monthly-trends</code></td><td>none</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
+      <h2>Domain Models (Pydantic)</h2>
+      <div class="card">
+        <ul class="plain">
+          <li><span class="k">InventoryItem</span> — sku, warehouse, category, stock levels</li>
+          <li><span class="k">Order</span> — id, date, warehouse, category, status, value</li>
+          <li><span class="k">DemandForecast</span> — sku, forecast quantity, trend</li>
+          <li><span class="k">BacklogItem</span> — blocked/queued work items</li>
+          <li><span class="k">PurchaseOrder</span> — restock orders with lead time</li>
+          <li><span class="k">CreatePurchaseOrderRequest</span> — POST payload shape</li>
+        </ul>
+      </div>
+
+      <h2 style="margin-top:1.75rem">Client / Server Contract Gaps</h2>
+      <div class="card">
+        <ul class="plain">
+          <li><span class="badge gap">404</span> &nbsp;<code>api.js</code> calls <code>/api/tasks</code> (GET/POST/PATCH/DELETE) — no matching FastAPI route exists</li>
+          <li><span class="badge gap">404</span> &nbsp;<code>api.js</code> calls <code>POST /api/purchase-orders</code> and <code>GET /api/purchase-orders/{id}</code> — models are defined, routes are not</li>
+          <li><span class="badge gap">unresolved</span> &nbsp;<code>Dashboard.vue</code> references <code>&lt;PurchaseOrderModal&gt;</code>, which is not present in <code>components/</code></li>
+          <li><span class="badge gap">i18n</span> &nbsp;The Reports nav label is hardcoded English in <code>App.vue</code>; <code>Reports.vue</code> and <code>Backlog.vue</code> bypass <code>t()</code></li>
+        </ul>
+        <p style="margin-top:0.75rem; font-size:0.813rem; color:var(--muted)">
+          These are the deliberately planted defects this demo repo ships with — listed here so the map matches reality rather than intent.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Technology Stack</h2>
+    <div class="grid-3">
+      <div class="card">
+        <div class="k">Frontend</div>
+        <ul class="plain">
+          <li>Vue <code>^3.4.21</code> — Composition API</li>
+          <li>vue-router <code>^4.3.0</code></li>
+          <li>axios <code>^1.6.7</code></li>
+          <li>Vite <code>^5.2.0</code> + <code>@vitejs/plugin-vue</code></li>
+          <li>Hand-rolled SVG charts, CSS Grid layout</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="k">Backend</div>
+        <ul class="plain">
+          <li>Python <code>&gt;=3.11</code>, managed by <code>uv</code></li>
+          <li>FastAPI <code>&gt;=0.110</code></li>
+          <li>uvicorn <code>&gt;=0.24</code></li>
+          <li>pydantic <code>&gt;=2.5</code></li>
+          <li>pytest + httpx for API tests</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="k">Tooling / Agents</div>
+        <ul class="plain">
+          <li><code>.mcp.json</code> — playwright + github MCP servers</li>
+          <li><code>.claude/agents/</code> — vue-expert, code-reviewer, security-auditor</li>
+          <li><code>.claude/skills/backend-api-test</code></li>
+          <li><code>.claude/commands/</code> — start, stop, test, optimize</li>
+          <li><code>.claude/hooks/post-tool-use.sh</code></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Conventions Worth Knowing</h2>
+    <div class="card">
+      <ul class="plain">
+        <li><span class="k">Reactivity</span> Raw API rows live in <code>ref</code>s; every aggregate is a <code>computed</code>. Never mutate a computed.</li>
+        <li><span class="k">Keys</span> <code>v-for</code> keys use domain identifiers (<code>sku</code>, <code>month</code>, <code>id</code>) — never the array index.</li>
+        <li><span class="k">Dates</span> Validate with <code>isNaN(date.getTime())</code> before calling <code>.getMonth()</code>.</li>
+        <li><span class="k">Filters</span> Inventory has no time dimension, so the month filter does not apply to it.</li>
+        <li><span class="k">Persistence</span> None. Mutations live in process memory; restarting the server reloads the JSON fixtures.</li>
+        <li><span class="k">Design system</span> Slate palette (<code>#0f172a</code>, <code>#64748b</code>, <code>#e2e8f0</code>), status colours green/blue/amber/red, no emojis in UI.</li>
+        <li><span class="k">Revenue goals</span> $800K per month, $9.6M year-to-date.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    Generated from a read of <code>server/main.py</code>, <code>client/src/</code>, <code>.mcp.json</code>, and the project CLAUDE.md files.
+  </footer>
+</main>
+</body>
+</html>

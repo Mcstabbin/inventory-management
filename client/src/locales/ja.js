@@ -6,6 +6,7 @@ export default {
     orders: '注文',
     finance: '財務',
     demandForecast: '需要予測',
+    restocking: '補充計画',
     companyName: '触媒コンポーネンツ',
     subtitle: '在庫管理システム'
   },
@@ -106,6 +107,8 @@ export default {
     title: '注文',
     description: '顧客注文の表示と管理',
     allOrders: 'すべての注文',
+    submittedOrders: '送信済み注文',
+    leadTime: 'リードタイム',
     totalOrders: '総注文数',
     totalRevenue: '総収益',
     avgOrderValue: '平均注文額',
@@ -188,6 +191,49 @@ export default {
     }
   },
 
+  // Restocking
+  restocking: {
+    title: '補充計画',
+    description: '需要に基づき、予算内で補充すべき品目を提案します',
+    budgetLabel: '利用可能な予算',
+    budgetHint: 'ドラッグして予算を設定してください。提案はリアルタイムで更新されます。',
+    coverageTitle: '予算カバレッジ',
+    fullyFunded: '全額割当',
+    partiallyFunded: '一部割当',
+    deferred: '見送り',
+    spend: '計画支出',
+    remaining: '残額',
+    maxNeeded: '全補充コスト',
+    fundedItems: '割当品目数',
+    fundedUnits: '割当数量',
+    deferredItems: '見送り品目数',
+    recommendations: '推奨補充品目',
+    placeOrder: '発注する',
+    placingOrder: '発注中...',
+    orderPlaced: '補充発注 {orderNumber} を送信しました',
+    nothingToOrder: 'この予算では発注できる品目がありません',
+    noRecommendations: 'すべての品目が目標在庫を上回っています。補充は不要です。',
+    priority: '優先度',
+    high: '高',
+    medium: '中',
+    low: '低',
+    table: {
+      item: '品目',
+      warehouse: '倉庫',
+      onHand: '在庫数',
+      reorderPoint: '発注点',
+      need: '不足',
+      order: '発注',
+      unitCost: '単価',
+      lineCost: '小計',
+      leadTime: 'リードタイム',
+      priority: '優先度',
+      funding: '割当状況'
+    },
+    daysLead: '{days}日',
+    ofNeeded: '/ {needed}'
+  },
+
   // Filters
   filters: {
     timePeriod: '期間',
@@ -204,6 +250,7 @@ export default {
     shipped: '出荷済み',
     processing: '処理中',
     backordered: 'バックオーダー',
+    submitted: '送信済み',
     inStock: '在庫あり',
     lowStock: '在庫僅少',
     adequate: '適量'
