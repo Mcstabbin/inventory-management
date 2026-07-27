@@ -7,6 +7,8 @@ export default {
     finance: 'Finance',
     demandForecast: 'Demand Forecast',
     restocking: 'Restocking',
+    reports: 'Reports',
+    backlog: 'Backlog',
     companyName: 'Catalyst Components',
     subtitle: 'Inventory Management System'
   },
@@ -232,6 +234,67 @@ export default {
     },
     daysLead: '{days} days',
     ofNeeded: 'of {needed}'
+  },
+
+  // Backlog
+  backlog: {
+    title: 'Backlog Management',
+    description: 'Track and resolve inventory shortages',
+    loading: 'Loading backlog...',
+    highPriority: 'High Priority',
+    mediumPriority: 'Medium Priority',
+    lowPriority: 'Low Priority',
+    totalItems: 'Total Backlog Items',
+    backlogItems: 'Backlog Items',
+    empty: 'No backlog items - all orders can be fulfilled!',
+    unitsShort: '{count} units short',
+    daysDelayed: '{days} days',
+    priorities: {
+      high: 'High',
+      medium: 'Medium',
+      low: 'Low'
+    },
+    table: {
+      orderId: 'Order ID',
+      sku: 'SKU',
+      itemName: 'Item Name',
+      quantityNeeded: 'Quantity Needed',
+      quantityAvailable: 'Quantity Available',
+      shortage: 'Shortage',
+      daysDelayed: 'Days Delayed',
+      priority: 'Priority'
+    }
+  },
+
+  // Reports
+  reports: {
+    title: 'Performance Reports',
+    description: 'View quarterly performance metrics and monthly trends',
+    loading: 'Loading reports...',
+    quarterlyPerformance: 'Quarterly Performance',
+    monthlyRevenueTrend: 'Monthly Revenue Trend',
+    monthOverMonth: 'Month-over-Month Analysis',
+    noData: 'No report data for the selected filters',
+    quarterly: {
+      quarter: 'Quarter',
+      totalOrders: 'Total Orders',
+      totalRevenue: 'Total Revenue',
+      avgOrderValue: 'Avg Order Value',
+      fulfillmentRate: 'Fulfillment Rate'
+    },
+    monthly: {
+      month: 'Month',
+      orders: 'Orders',
+      revenue: 'Revenue',
+      change: 'Change',
+      growthRate: 'Growth Rate'
+    },
+    summary: {
+      totalRevenueYtd: 'Total Revenue (YTD)',
+      avgMonthlyRevenue: 'Avg Monthly Revenue',
+      totalOrdersYtd: 'Total Orders (YTD)',
+      bestQuarter: 'Best Performing Quarter'
+    }
   },
 
   // Filters

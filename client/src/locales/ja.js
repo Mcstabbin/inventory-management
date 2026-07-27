@@ -7,6 +7,8 @@ export default {
     finance: '財務',
     demandForecast: '需要予測',
     restocking: '補充計画',
+    reports: 'レポート',
+    backlog: 'バックログ',
     companyName: '触媒コンポーネンツ',
     subtitle: '在庫管理システム'
   },
@@ -232,6 +234,67 @@ export default {
     },
     daysLead: '{days}日',
     ofNeeded: '/ {needed}'
+  },
+
+  // Backlog
+  backlog: {
+    title: 'バックログ管理',
+    description: '在庫不足の追跡と解消',
+    loading: 'バックログを読み込み中...',
+    highPriority: '高優先度',
+    mediumPriority: '中優先度',
+    lowPriority: '低優先度',
+    totalItems: 'バックログ総件数',
+    backlogItems: 'バックログ項目',
+    empty: 'バックログはありません。すべての注文が満たせます。',
+    unitsShort: '{count}個不足',
+    daysDelayed: '{days}日',
+    priorities: {
+      high: '高',
+      medium: '中',
+      low: '低'
+    },
+    table: {
+      orderId: '注文ID',
+      sku: 'SKU',
+      itemName: '品目名',
+      quantityNeeded: '必要数量',
+      quantityAvailable: '利用可能数量',
+      shortage: '不足',
+      daysDelayed: '遅延日数',
+      priority: '優先度'
+    }
+  },
+
+  // Reports
+  reports: {
+    title: 'パフォーマンスレポート',
+    description: '四半期のパフォーマンス指標と月次トレンドを表示します',
+    loading: 'レポートを読み込み中...',
+    quarterlyPerformance: '四半期パフォーマンス',
+    monthlyRevenueTrend: '月次収益トレンド',
+    monthOverMonth: '前月比分析',
+    noData: '選択したフィルターに該当するレポートデータがありません',
+    quarterly: {
+      quarter: '四半期',
+      totalOrders: '総注文数',
+      totalRevenue: '総収益',
+      avgOrderValue: '平均注文額',
+      fulfillmentRate: '達成率'
+    },
+    monthly: {
+      month: '月',
+      orders: '注文数',
+      revenue: '収益',
+      change: '変化',
+      growthRate: '成長率'
+    },
+    summary: {
+      totalRevenueYtd: '総収益（年初来）',
+      avgMonthlyRevenue: '月平均収益',
+      totalOrdersYtd: '総注文数（年初来）',
+      bestQuarter: '最高業績の四半期'
+    }
   },
 
   // Filters
